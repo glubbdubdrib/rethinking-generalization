@@ -52,26 +52,18 @@ random_state = 42
 classifiers = [
     RidgeClassifierCV(),
     RandomForestClassifier(),
-    # IsolationForest(),
     SVC(),
     DecisionTreeClassifier(),
     BaggingClassifier(),
     LogisticRegressionCV(),
     ExtraTreeClassifier(),
     SGDClassifier(),
-    PassiveAggressiveClassifier(),
-    AdaBoostClassifier(),
-    GradientBoostingClassifier(),
-    DecisionTreeClassifier(),
-    SGDClassifier(),
     RidgeClassifier(),
     PassiveAggressiveClassifier(),
     AdaBoostClassifier(),
     GradientBoostingClassifier(),
-    BaggingClassifier(),
     ExtraTreesClassifier(),
     LogisticRegression(),
-    LogisticRegressionCV(),
     KNeighborsClassifier(),
     GaussianProcessClassifier(),
     GaussianNB(),
@@ -97,17 +89,12 @@ logging.basicConfig(filename=log_file,
                     level=logging.DEBUG)
 
 # load dataset
-X, y = load_digits(return_X_y=True)
+X, y = make_classification(n_samples=100, n_features=1000, random_state=random_state)
 logging.info('Shape: %s, %s' % (X.shape, y.shape))
-# minimally prepare dataset
 X = X.astype('float32')
 y = LabelEncoder().fit_transform(y.astype('str'))
 
-# evaluate naive
-naive = DummyClassifier(strategy='most_frequent')
-
 scores = pd.DataFrame()
-fake_scores = pd.DataFrame()
 
 for classifier in classifiers:
 
