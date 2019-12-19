@@ -1,7 +1,7 @@
 import copy
 
 import sklearn
-from sklearn.datasets import load_wine
+from sklearn.datasets import load_wine, load_iris, load_digits
 import pandas as pd
 import numpy as np
 import logging
@@ -52,7 +52,7 @@ random_state = 42
 classifiers = [
     RidgeClassifierCV(),
     RandomForestClassifier(),
-    IsolationForest(),
+    # IsolationForest(),
     SVC(),
     DecisionTreeClassifier(),
     BaggingClassifier(),
@@ -63,15 +63,23 @@ classifiers = [
     AdaBoostClassifier(),
     GradientBoostingClassifier(),
     DecisionTreeClassifier(),
-    SGDClassifier(), RidgeClassifier(), RidgeClassifierCV(), PassiveAggressiveClassifier(),
-    AdaBoostClassifier(), GradientBoostingClassifier(),
-    BaggingClassifier(), ExtraTreesClassifier(),
-    LogisticRegression(), LogisticRegressionCV(),
+    SGDClassifier(),
+    RidgeClassifier(),
+    PassiveAggressiveClassifier(),
+    AdaBoostClassifier(),
+    GradientBoostingClassifier(),
+    BaggingClassifier(),
+    ExtraTreesClassifier(),
+    LogisticRegression(),
+    LogisticRegressionCV(),
     KNeighborsClassifier(),
     GaussianProcessClassifier(),
-    BernoulliNB(), GaussianNB(), LinearDiscriminantAnalysis(), LinearSVC(),
-    MultinomialNB(), NearestCentroid(),
-    NuSVC(), QuadraticDiscriminantAnalysis(),
+    GaussianNB(),
+    LinearDiscriminantAnalysis(),
+    LinearSVC(),
+    NearestCentroid(),
+    NuSVC(),
+    QuadraticDiscriminantAnalysis(),
 ]
 
 n_splits = 10
@@ -89,7 +97,7 @@ logging.basicConfig(filename=log_file,
                     level=logging.DEBUG)
 
 # load dataset
-X, y = load_wine(return_X_y=True)
+X, y = load_digits(return_X_y=True)
 logging.info('Shape: %s, %s' % (X.shape, y.shape))
 # minimally prepare dataset
 X = X.astype('float32')
@@ -103,15 +111,14 @@ fake_scores = pd.DataFrame()
 
 for classifier in classifiers:
 
-    cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
+    # cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
 
     if hasattr(classifier, "random_state"):
         classifier.random_state = random_state
 
-    pipeline = Pipeline([("scaler", MinMaxScaler()), ("classifier", copy.deepcopy(classifier))])
+    pipeline = Pipeline([("scaler", StandardScaler()), ("classifier", copy.deepcopy(classifier))])
 
-    true_scores = cross_validate(pipeline, X, y, scoring='accuracy', cv=cv, n_jobs=-1,
-                                 error_score='raise', return_train_score=True)
+    true_scores = cross_validate(pipeline, X, y, n_jobs=-1, cv=n_splits, return_train_score=True, scoring="f1_weighted")
 
     # fake dataset, that should have:
     # - same shape for X
@@ -120,25 +127,23 @@ for classifier in classifiers:
     # fix random seed
     logging.info("Randomizing dataset...")
     np.random.seed(42)
-    X_fake = np.random.rand(X.shape[0], X.shape[1])
-    np.random.shuffle(y)
+    X_fake = np.random.normal(0, 1, (X.shape[0], X.shape[1]))
+    y_fake = np.random.permutation(y)
 
-    fake_scores = cross_validate(pipeline, X_fake, y, scoring='accuracy', cv=cv, n_jobs=-1,
-                                 error_score='raise', return_train_score=True)
+    fake_scores = cross_validate(pipeline, X_fake, y_fake, cv=n_splits, n_jobs=-1, return_train_score=True, scoring="f1_weighted")
 
-    score_summary = {}
-    score_summary["classifier"] = classifier.__class__.__name__
-    score_summary["train_score_avg"] = mean(true_scores["train_score"])
-    score_summary["train_score_sem"] = sem(true_scores["train_score"])
-    score_summary["test_score_avg"] = mean(true_scores["test_score"])
-    score_summary["test_score_sem"] = sem(true_scores["test_score"])
-    score_summary["fake_train_score_avg"] = mean(fake_scores["train_score"])
-    score_summary["fake_train_score_sem"] = sem(fake_scores["train_score"])
-    score_summary["fake_test_score_avg"] = mean(fake_scores["test_score"])
-    score_summary["fake_test_score_sem"] = sem(fake_scores["test_score"])
+    score_summary = {"classifier": classifier.__class__.__name__,
+                     "train_score_avg": mean(true_scores["train_score"]),
+                     "train_score_sem": sem(true_scores["train_score"]),
+                     "test_score_avg": mean(true_scores["test_score"]),
+                     "test_score_sem": sem(true_scores["test_score"]),
+                     "fake_train_score_avg": mean(fake_scores["train_score"]),
+                     "fake_train_score_sem": sem(fake_scores["train_score"]),
+                     "fake_test_score_avg": mean(fake_scores["test_score"]),
+                     "fake_test_score_sem": sem(fake_scores["test_score"])}
     scores = pd.concat([scores, pd.Series(score_summary).to_frame()], ignore_index=True, axis=1)
 
-results_dir = "./results"
-if not os.path.isdir(results_dir):
-    os.makedirs(results_dir)
-scores.T.to_csv(os.path.join(results_dir, "scores.csv"))
+    results_dir = "./results"
+    if not os.path.isdir(results_dir):
+        os.makedirs(results_dir)
+    scores.T.to_csv(os.path.join(results_dir, "scores.csv"))
